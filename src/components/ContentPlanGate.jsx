@@ -21,8 +21,8 @@ export default function ContentPlanGate({ sessionId, nicheBrief, onBack, onConfi
   async function load() {
     setLoading(true); setError('');
     try {
-      const data = await api.generatePlan(sessionId, nicheBrief);
-      setPlan(data.content_plan);
+      const plan = await api.generatePlan(sessionId, nicheBrief);
+      setPlan(plan);
     } catch (e) { setError(e.message); }
     setLoading(false);
   }

@@ -34,8 +34,8 @@ export default function CopyReviewGate({ sessionId, nicheBrief, contentPlan, onB
   async function load() {
     setLoading(true); setError('');
     try {
-      const data = await api.generateCopy(sessionId, nicheBrief, contentPlan);
-      setAllCopy(data.all_copy);
+      const copy = await api.generateCopy(sessionId, nicheBrief, contentPlan);
+      setAllCopy(copy);
     } catch (e) { setError(e.message); }
     setLoading(false);
   }
