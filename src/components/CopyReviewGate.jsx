@@ -1,6 +1,51 @@
 // src/components/CopyReviewGate.jsx
 import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
+
+// Shows live carousel copy progress while generating
+function CopyProgressWatcher({ sessionId, contentPlan }) {
+  const [partialCopy, setPartialCopy] = useState([]);
+
+  useEffect(() => {
+    const iv = setInterval(async () => {
+      const { data } = await supabase
+        .from('sessions')
+        .select('all_copy')
+        .eq('id', sessionId)
+        .single();
+      if (data?.all_copy?.length) setPartialCopy(data.all_copy);
+    }, 3000);
+    return () => clearInterval(iv);
+  }, [sessionId]);
+
+  if (!partialCopy.length) return (
+    <div style={{ marginTop: 20 }}>
+      {contentPlan?.map((c, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--border)' }} />
+          <span className="muted" style={{ fontSize: 12 }}>Carousel {c.carousel_num}: {c.hook}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      {contentPlan?.map((c, i) => {
+        const done = partialCopy.find(p => p.carousel_num === c.carousel_num);
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: done ? 'var(--success)' : 'var(--border)', transition: 'background 0.3s' }} />
+            <span style={{ fontSize: 12, color: done ? 'var(--text)' : 'var(--muted)' }}>
+              {done ? '✓ ' : ''}{c.hook}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function SlideEditor({ slide, onChange }) {
   return (
@@ -60,8 +105,9 @@ export default function CopyReviewGate({ sessionId, nicheBrief, contentPlan, onB
 
   if (loading) return (
     <div className="card" style={{ textAlign: 'center', padding: 60 }}>
-      <p className="muted">Writing all your copy...</p>
-      <p className="muted" style={{ marginTop: 8, fontSize: 11 }}>Headlines, body copy, captions, and hashtags for every carousel</p>
+      <p className="muted">Writing copy for your carousels...</p>
+      <p className="muted" style={{ marginTop: 8, fontSize: 11 }}>Generating one carousel at a time — this takes 1-2 min</p>
+      <CopyProgressWatcher sessionId={sessionId} contentPlan={contentPlan} />
     </div>
   );
 

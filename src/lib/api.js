@@ -16,28 +16,21 @@ async function post(path, body) {
     headers: { 'Content-Type': 'application/json', Authorization: auth },
     body: JSON.stringify(body),
   });
-
-  // Safely parse body — background functions sometimes return empty 202
   let data = {};
   const text = await res.text();
-  if (text) {
-    try { data = JSON.parse(text); } catch (_) { data = {}; }
-  }
-
-  if (!res.ok && res.status !== 202) {
-    throw new Error(data.error || `Request failed: ${res.status}`);
-  }
+  if (text) { try { data = JSON.parse(text); } catch (_) { data = {}; } }
+  if (!res.ok && res.status !== 202) throw new Error(data.error || `Request failed: ${res.status}`);
   return data;
 }
 
-// Poll a session field until it hits 'done' or 'failed'
-export async function pollSession(sessionId, statusField, resultField, intervalMs = 2000, timeoutMs = 120000) {
+// Poll until statusField = 'done' or 'failed'
+export async function pollSession(sessionId, statusField, resultField, intervalMs = 2500, timeoutMs = 600000) {
   const start = Date.now();
   return new Promise((resolve, reject) => {
     const iv = setInterval(async () => {
       if (Date.now() - start > timeoutMs) {
         clearInterval(iv);
-        reject(new Error('Timed out waiting for result. Check Netlify function logs.'));
+        reject(new Error('Timed out — check Netlify function logs for details.'));
         return;
       }
       try {
@@ -46,13 +39,16 @@ export async function pollSession(sessionId, statusField, resultField, intervalM
           .select(`${statusField}, ${resultField}`)
           .eq('id', sessionId)
           .single();
-        if (error || !data) return; // retry on error
-        if (data[statusField] === 'done') {
+        if (error || !data) return;
+        if (data[statusField] === 'done') { clearInterval(iv); resolve(data[resultField]); }
+        else if (data[statusField] === 'failed') {
           clearInterval(iv);
-          resolve(data[resultField]);
-        } else if (data[statusField] === 'failed') {
-          clearInterval(iv);
-          reject(new Error(`Generation failed — check Netlify logs for ${statusField}`));
+          // Fetch the error detail
+          const { data: errRow } = await supabase.from('sessions')
+            .select(`${statusField.replace('_status', '_error')}`)
+            .eq('id', sessionId).single();
+          const errMsg = errRow?.[statusField.replace('_status', '_error')] || 'Unknown error';
+          reject(new Error(errMsg));
         }
       } catch (_) { /* retry */ }
     }, intervalMs);
@@ -71,14 +67,14 @@ export const api = {
 
   generateVisualDNA: async (session_id, niche_brief, generate_sample = true) => {
     await post('generate-visual-dna-background', { session_id, niche_brief, generate_sample });
-    const dna = await pollSession(session_id, 'dna_status', 'visual_dna', 2000, 180000);
+    const dna = await pollSession(session_id, 'dna_status', 'visual_dna', 2500, 300000);
     return { visual_dna: dna };
   },
 
+  // Copy polls with 10 min timeout — generates one carousel at a time
   generateCopy: async (session_id, niche_brief, content_plan) => {
     await post('generate-copy-background', { session_id, niche_brief, content_plan });
-    const copy = await pollSession(session_id, 'copy_status', 'all_copy', 2000, 180000);
-    return { all_copy: copy };
+    return pollSession(session_id, 'copy_status', 'all_copy', 2500, 600000);
   },
 
   generateImages: (session_id, all_copy, visual_dna) =>

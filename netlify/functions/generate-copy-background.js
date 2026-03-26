@@ -1,4 +1,5 @@
 // netlify/functions/generate-copy-background.js
+// Generates copy one carousel at a time to avoid token limits and timeouts
 const { validateUser, callClaude, getSupabaseAdmin, CORS } = require('./_utils');
 
 const SYSTEM = `You are an expert Instagram copywriter for faceless niche pages. You write copy that sounds like a real human in the niche — not an AI.
@@ -14,7 +15,7 @@ HARD RULES:
 - Start captions with the hook — most valuable or provocative line.
 - End captions with a direct question OR specific save CTA.
 
-Respond ONLY with valid raw JSON — no markdown fences, no preamble. Start directly with [`;
+Respond ONLY with valid raw JSON — no markdown fences, no preamble. Start directly with {`;
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS };
@@ -33,36 +34,47 @@ exports.handler = async (event) => {
 
     await db.from('sessions').update({ copy_status: 'generating' }).eq('id', session_id);
 
-    const result = await callClaude({
-      system: SYSTEM,
-      maxTokens: 6000,
-      user: `Niche: "${session.topic}" | Voice: "${b.voice_descriptor}"
+    const allCopy = [];
+
+    // Generate one carousel at a time — avoids token limits and timeouts
+    for (const carousel of content_plan) {
+      const result = await callClaude({
+        system: SYSTEM,
+        maxTokens: 2000,
+        user: `Niche: "${session.topic}" | Voice: "${b.voice_descriptor}"
 Audience: ${b.audience}
-Niche slang to use naturally: ${b.niche_slang?.join(', ')}
+Niche slang to use naturally: ${(b.niche_slang || []).join(', ')}
 Viral insight: ${b.viral_insight}
-Pain points: ${b.pain_points.join(', ')}
-Desires: ${b.desires.join(', ')}
 
-Content plan:
-${content_plan.map(c => `Carousel ${c.carousel_num}: "${c.hook}" — ${c.topic} (${c.format}, ${c.recommended_slides} slides) — angle: ${c.angle}`).join('\n')}
+Write copy for this ONE carousel:
+Carousel ${carousel.carousel_num}: "${carousel.hook}"
+Topic: ${carousel.topic}
+Format: ${carousel.format}
+Slides: ${carousel.recommended_slides}
+Angle: ${carousel.angle}
 
-Write all copy for every carousel. Match the voice_descriptor. Use niche slang naturally.
-
-Return JSON array:
-[{
-  "carousel_num": 1,
+Return a single JSON object (not an array):
+{
+  "carousel_num": ${carousel.carousel_num},
   "slides": [
     {"num": 1, "type": "cover", "headline": "hook headline max 8 words", "subtext": "optional 4-6 word subtext or empty string", "body": ""},
-    {"num": 2, "type": "content", "headline": "slide headline max 6 words", "subtext": "", "body": "2-3 punchy lines. No padding."},
-    {"num": N, "type": "cta", "headline": "Follow for more [niche topic]", "subtext": "", "body": "Save this. You'll thank yourself later."}
+    {"num": 2, "type": "content", "headline": "slide headline max 6 words", "subtext": "", "body": "2-3 punchy lines. Each line is a complete thought."},
+    ... continue for all ${carousel.recommended_slides} slides ...
+    {"num": ${carousel.recommended_slides}, "type": "cta", "headline": "Follow for more [niche] tips", "subtext": "", "body": "Save this. You'll need it later."}
   ],
-  "caption": "Full caption. Hook first. 80-150 words.",
-  "hashtags": "#tag1 #tag2 ... (12-18 hashtags)",
-  "image_prompt_subjects": ["what slide 1 image should depict", "what slide 2 image should depict"]
-}]`,
-    });
+  "caption": "Full caption. Hook first. 80-150 words. No hashtags.",
+  "hashtags": "#tag1 #tag2 ... (12-18 hashtags, mix niche-specific and mid-size)",
+  "image_prompt_subjects": ["brief subject description for slide 1 image", "for slide 2", ... for all ${carousel.recommended_slides} slides]
+}`,
+      });
 
-    await db.from('sessions').update({ all_copy: result, copy_status: 'done' }).eq('id', session_id);
+      allCopy.push(result);
+
+      // Write partial progress after each carousel
+      await db.from('sessions').update({ all_copy: allCopy }).eq('id', session_id);
+    }
+
+    await db.from('sessions').update({ all_copy: allCopy, copy_status: 'done' }).eq('id', session_id);
 
   } catch (e) {
     console.error('generate-copy-background error:', e.message);
