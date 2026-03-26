@@ -5,39 +5,25 @@ const SYSTEM = `You are an art director specializing in Instagram visual identit
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS };
-  if (event.httpMethod !== 'POST')    return { statusCode: 405, body: 'Method not allowed' };
 
-  let userId, body;
-  try {
-    userId = await validateUser(event.headers.authorization);
-    body = JSON.parse(event.body);
-  } catch (e) {
-    return { statusCode: 400, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ error: e.message }) };
-  }
-
-  const { session_id, niche_brief, generate_sample = true } = body;
   const db = getSupabaseAdmin();
-  const { data: session } = await db.from('sessions').select('*').eq('id', session_id).eq('user_id', userId).single();
-  if (!session) return { statusCode: 404, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Session not found' }) };
+  let session_id;
 
-  runVisualDNA(session, niche_brief, generate_sample, db).catch(async (err) => {
-    await db.from('sessions').update({ dna_status: 'failed', dna_error: err.message }).eq('id', session_id);
-  });
+  try {
+    await validateUser(event.headers.authorization);
+    const body = JSON.parse(event.body || '{}');
+    session_id = body.session_id;
+    const { niche_brief: b, generate_sample = true } = body;
 
-  return {
-    statusCode: 202,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: 'Visual DNA generation started' }),
-  };
-};
+    const { data: session } = await db.from('sessions').select('*').eq('id', session_id).single();
+    if (!session) throw new Error('Session not found');
 
-async function runVisualDNA(session, b, generate_sample, db) {
-  await db.from('sessions').update({ dna_status: 'generating' }).eq('id', session.id);
+    await db.from('sessions').update({ dna_status: 'generating' }).eq('id', session_id);
 
-  const dna = await callClaude({
-    system: SYSTEM,
-    maxTokens: 1000,
-    user: `Niche: "${session.topic}" | Audience: "${b.audience}" | Tone: "${b.voice_descriptor}"
+    const dna = await callClaude({
+      system: SYSTEM,
+      maxTokens: 1000,
+      user: `Niche: "${session.topic}" | Audience: "${b.audience}" | Tone: "${b.voice_descriptor}"
 Viral insight: "${b.viral_insight}"
 
 Design a cohesive visual system for a faceless Instagram page. Must be specific enough that 40+ separately generated images look like one art director made them.
@@ -55,21 +41,25 @@ Design a cohesive visual system for a faceless Instagram page. Must be specific 
   "texture_surface": "surface and texture feel",
   "subject_framing": "what distance/angle shots to use",
   "what_to_avoid": "3-4 things that break the aesthetic",
-  "dalle_style_anchor": "60-80 word paragraph prepended to every image prompt. Encode art style, colors, lighting, mood. Written as DALL-E prompt language. End with: Do NOT include any text, words, letters, numbers, or typographic elements in this image."
+  "dalle_style_anchor": "60-80 word paragraph prepended to every image prompt. Written as DALL-E prompt language. End with: Do NOT include any text, words, letters, numbers, or typographic elements in this image."
 }`,
-  });
+    });
 
-  let sample_image_url = null;
-  if (generate_sample) {
-    try {
-      const samplePrompt = `${dna.dalle_style_anchor} Subject: a close-up of relevant objects from the "${session.topic}" niche on a textured natural surface, beautifully composed.`;
-      const tempUrl = await callDallE(samplePrompt);
-      sample_image_url = await storeImage(tempUrl, `${session.id}/sample.png`);
-    } catch (imgErr) {
-      console.error('Sample image failed:', imgErr.message);
+    let sample_image_url = null;
+    if (generate_sample) {
+      try {
+        const samplePrompt = `${dna.dalle_style_anchor} Subject: a close-up of objects related to "${session.topic}" on a textured natural surface, beautifully composed.`;
+        const tempUrl = await callDallE(samplePrompt);
+        sample_image_url = await storeImage(tempUrl, `${session_id}/sample.png`);
+      } catch (imgErr) {
+        console.error('Sample image failed:', imgErr.message);
+      }
     }
-  }
 
-  const payload = { ...dna, sample_image_url };
-  await db.from('sessions').update({ visual_dna: payload, dna_status: 'done' }).eq('id', session.id);
-}
+    await db.from('sessions').update({ visual_dna: { ...dna, sample_image_url }, dna_status: 'done' }).eq('id', session_id);
+
+  } catch (e) {
+    console.error('generate-visual-dna-background error:', e.message);
+    if (session_id) await db.from('sessions').update({ dna_status: 'failed', dna_error: e.message }).eq('id', session_id);
+  }
+};
