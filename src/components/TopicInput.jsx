@@ -1,5 +1,6 @@
 // src/components/TopicInput.jsx
 import { useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { api, pollSession } from '../lib/api';
 
 const GOALS = [
@@ -19,15 +20,38 @@ export default function TopicInput({ onComplete }) {
 
   async function submit() {
     if (!topic.trim()) return;
-    setLoading(true); setError(''); setStatus('Researching your niche...');
+    setLoading(true); setError(''); setStatus('Setting up session...');
     try {
-      // Step 1: fire background function, get session_id back instantly
-      const { session_id } = await api.generateNiche(topic.trim(), goal);
+      // Step 1: create session row directly from frontend — no need to parse function response
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: session, error: sessionErr } = await supabase
+        .from('sessions')
+        .insert({
+          user_id: user.id,
+          topic: topic.trim(),
+          goal,
+          status: 'drafting',
+          niche_status: 'pending',
+        })
+        .select('id')
+        .single();
+
+      if (sessionErr) throw new Error(sessionErr.message);
+
+      const session_id = session.id;
+      setStatus('Researching your niche...');
+
+      // Step 2: fire background function with known session_id
+      await api.generateNiche(session_id, topic.trim(), goal);
+
+      // Step 3: poll until done
       setStatus('Analyzing audience, pillars, and viral patterns...');
-      // Step 2: poll until niche_brief is written to Supabase
       const niche_brief = await pollSession(session_id, 'niche_status', 'niche_brief');
+
       onComplete(topic.trim(), goal, session_id, niche_brief);
-    } catch (e) { setError(e.message); }
+    } catch (e) {
+      setError(e.message);
+    }
     setLoading(false); setStatus('');
   }
 
@@ -56,7 +80,7 @@ export default function TopicInput({ onComplete }) {
           />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
             {EXAMPLES.map(ex => (
-              <button key={ex} onClick={() => setTopic(ex)} disabled={loading}
+              <button key={ex} onClick={() => !loading && setTopic(ex)} disabled={loading}
                 style={{ background: 'var(--accentbg)', border: '1px solid var(--borderl)', color: 'var(--muted)', borderRadius: 20, padding: '3px 10px', fontSize: 11, cursor: 'pointer', transition: 'all 0.1s' }}
                 onMouseEnter={e => { if (!loading) e.target.style.color = 'var(--accent)'; }}
                 onMouseLeave={e => e.target.style.color = 'var(--muted)'}
@@ -69,7 +93,7 @@ export default function TopicInput({ onComplete }) {
           <div className="label">NICHE GOAL</div>
           <div style={{ display: 'flex', gap: 8 }}>
             {GOALS.map(g => (
-              <button key={g.value} onClick={() => setGoal(g.value)} disabled={loading}
+              <button key={g.value} onClick={() => !loading && setGoal(g.value)} disabled={loading}
                 className={`btn ${goal === g.value ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ flex: 1, fontSize: 11 }}>
                 {g.label}

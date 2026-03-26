@@ -60,9 +60,8 @@ export async function pollSession(sessionId, statusField, resultField, intervalM
 }
 
 export const api = {
-  generateNiche: async (topic, goal) => {
-    const data = await post('generate-niche-background', { topic, goal });
-    return data; // { session_id }
+  generateNiche: async (session_id, topic, goal) => {
+    await post('generate-niche-background', { session_id, topic, goal });
   },
 
   generatePlan: async (session_id, niche_brief) => {
