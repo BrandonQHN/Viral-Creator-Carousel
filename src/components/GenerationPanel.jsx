@@ -44,6 +44,19 @@ export default function GenerationPanel({ session, onComplete }) {
 
   async function start() {
     try {
+      // Debug — log what we're sending
+      console.log('GenerationPanel start:', {
+        session_id: session.session_id,
+        has_all_copy: !!session.all_copy,
+        all_copy_length: session.all_copy?.length,
+        has_visual_dna: !!session.visual_dna,
+        has_dalle_anchor: !!session.visual_dna?.dalle_style_anchor,
+      });
+
+      if (!session.session_id) { setError('Missing session_id'); return; }
+      if (!session.all_copy?.length) { setError('Missing copy data — go back to copy review step'); return; }
+      if (!session.visual_dna) { setError('Missing visual DNA — go back to visual step'); return; }
+
       // 1. Kick off background function (returns 202 immediately)
       await api.generateImages(session.session_id, session.all_copy, session.visual_dna);
       setSessionStatus('generating');

@@ -93,7 +93,11 @@ export default function App() {
             nicheBrief={session.niche_brief}
             contentPlan={session.content_plan}
             onBack={() => setStep('visual')}
-            onConfirm={(copy) => { update('all_copy', copy); setStep('generating'); }}
+            onConfirm={(copy) => {
+              setSession(s => ({ ...s, all_copy: copy }));
+              // Small delay to ensure state is committed before GenerationPanel mounts
+              setTimeout(() => setStep('generating'), 50);
+            }}
           />
         )}
         {step === 'generating' && (
