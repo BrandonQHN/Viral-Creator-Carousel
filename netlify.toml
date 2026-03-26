@@ -5,9 +5,8 @@
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["@supabase/supabase-js"]
+  included_files = ["netlify/functions/**"]
 
-# Short functions — default 10s is fine
 [functions."generate-niche"]
   timeout = 30
 
@@ -20,9 +19,6 @@
 [functions."generate-copy"]
   timeout = 60
 
-# Image generation is a Background Function (up to 15 min)
-# Netlify auto-detects background functions by the -background suffix
-# Returns 202 immediately — frontend polls Supabase for progress
 [functions."generate-images-background"]
   timeout = 900
 
@@ -35,3 +31,4 @@
   command = "npm run dev"
   port = 5173
   targetPort = 5173
+  autoLaunch = false
