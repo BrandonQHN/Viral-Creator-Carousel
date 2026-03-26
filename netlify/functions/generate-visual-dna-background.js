@@ -43,7 +43,8 @@ Adapt the style specifically to this niche's aesthetic and audience. 40+ images 
   "texture_surface": "texture feel — e.g. slight paper texture, gentle grain",
   "subject_framing": "what to depict — e.g. close-up of subject, minimal background, clear focal point",
   "what_to_avoid": "e.g. photorealism, cluttered compositions, dark moody tones, complex backgrounds, text",
-  "dalle_style_anchor": "60-80 words prepended to every DALL-E prompt. Must encode: illustration style, color palette, mood, composition rules. Written as DALL-E prompt language, not prose. Make it specific to this niche. End EXACTLY with this sentence: Do NOT include any text, words, letters, numbers, or typographic elements in this image."
+  "slide_text_style": "Choose ONE: 'minimal' (image-forward — only headline on slide, body in caption; for lifestyle/aesthetic/story niches), 'overlay' (text-forward — headline + bullets on slide; for educational/tips/how-to niches), or 'balanced' (headline + one short line; for most niches). Base this on the niche, audience, and viral insight.",
+  "dalle_style_anchor": "60-80 words prepended to every DALL-E prompt. Must encode: illustration style, color palette, mood, composition rules. Written as DALL-E prompt language, not prose. Make it specific to this niche. MUST include this rule: main subject positioned in upper 60% of frame, bottom third kept clean and uncluttered for text overlay. End EXACTLY with this sentence: Do NOT include any text, words, letters, numbers, or typographic elements in this image."
 }`,
     });
 

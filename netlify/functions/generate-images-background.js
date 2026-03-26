@@ -38,6 +38,8 @@ exports.handler = async (event) => {
 
 Generate one DALL-E 3 image prompt per slide. Each prompt = anchor (verbatim first) + slide subject. Max 150 words each. Never include text, words, letters, or typography in any image.
 
+CRITICAL for every prompt: the bottom third of the image must be relatively clean, dark, or uncluttered — this space is reserved for text overlay. Place the main subject in the upper 60-70% of the frame. Do not put detailed focal points at the very bottom of the image.
+
 Slides:
 ${allSubjects.map((s, i) => `${i + 1}. Carousel ${s.carousel_num}, Slide ${s.slide_num}: ${s.subject}`).join('\n')}
 

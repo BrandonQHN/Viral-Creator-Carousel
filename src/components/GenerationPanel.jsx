@@ -8,6 +8,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
+import { compositeSlide } from '../lib/compositor';
+
+function CompositedThumb({ imageUrl, slide, visualDna }) {
+  const [src, setSrc] = useState(imageUrl);
+  useEffect(() => {
+    if (!imageUrl || !slide) return;
+    compositeSlide(imageUrl, slide, visualDna)
+      .then(setSrc)
+      .catch(() => setSrc(imageUrl));
+  }, [imageUrl]);
+  return (
+    <img src={src} alt="" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border)', animation: 'fadeIn 0.3s ease' }} />
+  );
+}
 
 export default function GenerationPanel({ session, onComplete }) {
   const [carousels, setCarousels]     = useState([]);
@@ -176,17 +190,13 @@ export default function GenerationPanel({ session, onComplete }) {
                   {slides.filter(s => s.image_url).length > 0 && (
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 4 }}>
                       {slides.filter(s => s.image_url).map((slide, i) => (
-                        <img
-                          key={i}
-                          src={slide.image_url}
-                          alt={`Slide ${slide.num}`}
-                          style={{
-                            width: 48, height: 48, objectFit: 'cover',
-                            borderRadius: 4, border: '1px solid var(--border)',
-                            animation: 'fadeIn 0.3s ease',
-                          }}
-                        />
-                      ))}
+                    <CompositedThumb
+                      key={i}
+                      imageUrl={slide.image_url}
+                      slide={c.slides?.[i]}
+                      visualDna={session.visual_dna}
+                    />
+                  ))}
                     </div>
                   )}
                 </div>
