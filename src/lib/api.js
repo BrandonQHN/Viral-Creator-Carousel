@@ -16,41 +16,50 @@ async function post(path, body) {
     headers: { 'Content-Type': 'application/json', Authorization: auth },
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok && res.status !== 202) throw new Error(data.error || `Request failed: ${res.status}`);
+
+  // Safely parse body — background functions sometimes return empty 202
+  let data = {};
+  const text = await res.text();
+  if (text) {
+    try { data = JSON.parse(text); } catch (_) { data = {}; }
+  }
+
+  if (!res.ok && res.status !== 202) {
+    throw new Error(data.error || `Request failed: ${res.status}`);
+  }
   return data;
 }
 
 // Poll a session field until it hits 'done' or 'failed'
-// statusField: e.g. 'niche_status', resultField: e.g. 'niche_brief'
 export async function pollSession(sessionId, statusField, resultField, intervalMs = 2000, timeoutMs = 120000) {
   const start = Date.now();
   return new Promise((resolve, reject) => {
     const iv = setInterval(async () => {
       if (Date.now() - start > timeoutMs) {
         clearInterval(iv);
-        reject(new Error('Timed out waiting for result'));
+        reject(new Error('Timed out waiting for result. Check Netlify function logs.'));
         return;
       }
-      const { data, error } = await supabase
-        .from('sessions')
-        .select(`${statusField}, ${resultField}`)
-        .eq('id', sessionId)
-        .single();
-      if (error) return; // retry
-      if (data[statusField] === 'done') {
-        clearInterval(iv);
-        resolve(data[resultField]);
-      } else if (data[statusField] === 'failed') {
-        clearInterval(iv);
-        reject(new Error(`Generation failed for ${statusField}`));
-      }
+      try {
+        const { data, error } = await supabase
+          .from('sessions')
+          .select(`${statusField}, ${resultField}`)
+          .eq('id', sessionId)
+          .single();
+        if (error || !data) return; // retry on error
+        if (data[statusField] === 'done') {
+          clearInterval(iv);
+          resolve(data[resultField]);
+        } else if (data[statusField] === 'failed') {
+          clearInterval(iv);
+          reject(new Error(`Generation failed — check Netlify logs for ${statusField}`));
+        }
+      } catch (_) { /* retry */ }
     }, intervalMs);
   });
 }
 
 export const api = {
-  // Fires background function, returns session_id immediately
   generateNiche: async (topic, goal) => {
     const data = await post('generate-niche-background', { topic, goal });
     return data; // { session_id }
@@ -63,7 +72,7 @@ export const api = {
 
   generateVisualDNA: async (session_id, niche_brief, generate_sample = true) => {
     await post('generate-visual-dna-background', { session_id, niche_brief, generate_sample });
-    const dna = await pollSession(session_id, 'dna_status', 'visual_dna', 2000, 180000); // 3min timeout for sample image
+    const dna = await pollSession(session_id, 'dna_status', 'visual_dna', 2000, 180000);
     return { visual_dna: dna };
   },
 

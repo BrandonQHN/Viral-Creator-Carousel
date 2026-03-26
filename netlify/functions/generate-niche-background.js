@@ -1,37 +1,64 @@
 // netlify/functions/generate-niche-background.js
 const { validateUser, checkUsageCap, callClaude, getSupabaseAdmin, CORS } = require('./_utils');
 
-const SYSTEM = `You are an expert Instagram growth strategist specializing in faceless niche pages. You deeply understand what makes content go viral in specific communities. Respond ONLY with valid raw JSON — no markdown fences, no preamble, no explanation. Start directly with {`;
+const SYSTEM = `You are an expert Instagram growth strategist specializing in faceless niche pages. Respond ONLY with valid raw JSON — no markdown fences, no preamble. Start directly with {`;
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS };
-  if (event.httpMethod !== 'POST')    return { statusCode: 405, body: 'Method not allowed' };
+  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: 'Method not allowed' };
 
   let userId, body;
   try {
     userId = await validateUser(event.headers.authorization);
     await checkUsageCap(userId);
-    body = JSON.parse(event.body);
+    body = JSON.parse(event.body || '{}');
   } catch (e) {
-    return { statusCode: 400, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ error: e.message }) };
+    return {
+      statusCode: 400,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: e.message }),
+    };
   }
 
   const { topic, goal } = body;
-  if (!topic?.trim()) return { statusCode: 400, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Topic is required' }) };
+  if (!topic?.trim()) return {
+    statusCode: 400,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ error: 'Topic is required' }),
+  };
 
-  // Create session row synchronously before returning 202
   const db = getSupabaseAdmin();
-  const { data: session, error: sessionErr } = await db
-    .from('sessions')
-    .insert({ user_id: userId, topic: topic.trim(), goal: goal || 'grow audience', status: 'drafting' })
-    .select('id')
-    .single();
 
-  if (sessionErr) return { statusCode: 500, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ error: sessionErr.message }) };
+  // Create session row synchronously — must happen before 202 so frontend gets session_id
+  let session;
+  try {
+    const { data, error } = await db
+      .from('sessions')
+      .insert({
+        user_id: userId,
+        topic: topic.trim(),
+        goal: goal || 'grow audience',
+        status: 'drafting',
+        niche_status: 'pending',
+      })
+      .select('id')
+      .single();
+    if (error) throw new Error(error.message);
+    session = data;
+  } catch (e) {
+    return {
+      statusCode: 500,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: `DB error: ${e.message}` }),
+    };
+  }
 
-  // Kick off background work
-  runNiche(session.id, topic, goal, db).catch(async (err) => {
-    await db.from('sessions').update({ niche_status: 'failed', niche_error: err.message }).eq('id', session.id);
+  // Fire async — Netlify keeps Lambda alive after 202 return
+  runNiche(session.id, topic.trim(), goal, db).catch(async (err) => {
+    console.error('Niche generation failed:', err.message);
+    await db.from('sessions')
+      .update({ niche_status: 'failed', niche_error: err.message })
+      .eq('id', session.id);
   });
 
   return {
@@ -67,5 +94,7 @@ Return this exact JSON:
 }`,
   });
 
-  await db.from('sessions').update({ niche_brief: result, niche_status: 'done' }).eq('id', sessionId);
+  await db.from('sessions')
+    .update({ niche_brief: result, niche_status: 'done' })
+    .eq('id', sessionId);
 }
