@@ -26,7 +26,7 @@ exports.handler = async (event) => {
 
     const result = await callClaude({
       system: SYSTEM,
-      maxTokens: 1200,
+      maxTokens: 800,
       user: `Research this Instagram niche topic: "${topic}"
 Niche goal: "${goal || 'grow audience'}" (grow audience / educate / sell)
 

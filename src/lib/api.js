@@ -17,20 +17,62 @@ async function post(path, body) {
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  // Accept 202 (background function accepted) as success
   if (!res.ok && res.status !== 202) throw new Error(data.error || `Request failed: ${res.status}`);
   return data;
 }
 
-export const api = {
-  generateNiche:     (topic, goal)                           => post('generate-niche',     { topic, goal }),
-  generatePlan:      (session_id, niche_brief)               => post('generate-plan',      { session_id, niche_brief }),
-  generateVisualDNA: (session_id, niche_brief, generate_sample = true) =>
-                                                                post('generate-visual-dna', { session_id, niche_brief, generate_sample }),
-  generateCopy:      (session_id, niche_brief, content_plan) => post('generate-copy',       { session_id, niche_brief, content_plan }),
+// Poll a session field until it hits 'done' or 'failed'
+// statusField: e.g. 'niche_status', resultField: e.g. 'niche_brief'
+export async function pollSession(sessionId, statusField, resultField, intervalMs = 2000, timeoutMs = 120000) {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const iv = setInterval(async () => {
+      if (Date.now() - start > timeoutMs) {
+        clearInterval(iv);
+        reject(new Error('Timed out waiting for result'));
+        return;
+      }
+      const { data, error } = await supabase
+        .from('sessions')
+        .select(`${statusField}, ${resultField}`)
+        .eq('id', sessionId)
+        .single();
+      if (error) return; // retry
+      if (data[statusField] === 'done') {
+        clearInterval(iv);
+        resolve(data[resultField]);
+      } else if (data[statusField] === 'failed') {
+        clearInterval(iv);
+        reject(new Error(`Generation failed for ${statusField}`));
+      }
+    }, intervalMs);
+  });
+}
 
-  // Fires the background function (returns 202 immediately).
-  // Frontend subscribes to Supabase Realtime for live progress — no connection held open.
+export const api = {
+  // Fires background function, returns session_id immediately
+  generateNiche: async (topic, goal) => {
+    const data = await post('generate-niche-background', { topic, goal });
+    return data; // { session_id }
+  },
+
+  generatePlan: async (session_id, niche_brief) => {
+    await post('generate-plan-background', { session_id, niche_brief });
+    return pollSession(session_id, 'plan_status', 'content_plan');
+  },
+
+  generateVisualDNA: async (session_id, niche_brief, generate_sample = true) => {
+    await post('generate-visual-dna-background', { session_id, niche_brief, generate_sample });
+    const dna = await pollSession(session_id, 'dna_status', 'visual_dna', 2000, 180000); // 3min timeout for sample image
+    return { visual_dna: dna };
+  },
+
+  generateCopy: async (session_id, niche_brief, content_plan) => {
+    await post('generate-copy-background', { session_id, niche_brief, content_plan });
+    const copy = await pollSession(session_id, 'copy_status', 'all_copy', 2000, 180000);
+    return { all_copy: copy };
+  },
+
   generateImages: (session_id, all_copy, visual_dna) =>
     post('generate-images-background', { session_id, all_copy, visual_dna }),
 };

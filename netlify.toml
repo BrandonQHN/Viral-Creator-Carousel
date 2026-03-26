@@ -5,19 +5,19 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["netlify/functions/**"]
 
-[functions."generate-niche"]
-  timeout = 30
-
-[functions."generate-plan"]
-  timeout = 30
-
-[functions."generate-visual-dna"]
+# All AI functions are background (up to 15 min, return 202 immediately)
+[functions."generate-niche-background"]
   timeout = 60
 
-[functions."generate-copy"]
+[functions."generate-plan-background"]
   timeout = 60
+
+[functions."generate-visual-dna-background"]
+  timeout = 180
+
+[functions."generate-copy-background"]
+  timeout = 180
 
 [functions."generate-images-background"]
   timeout = 900

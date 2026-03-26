@@ -19,7 +19,7 @@ exports.handler = async (event) => {
 
     const result = await callClaude({
       system: SYSTEM,
-      maxTokens: 2000,
+      maxTokens: 1200,
       user: `Niche: "${session.topic}" | Goal: "${session.goal}"
 Audience: ${b.audience}
 Pain points: ${b.pain_points.join(', ')}

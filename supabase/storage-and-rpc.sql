@@ -43,3 +43,15 @@ alter table public.sessions
 -- Toggle on the 'carousels' table under supabase_realtime publication.
 -- Or run:
 alter publication supabase_realtime add table public.carousels;
+
+-- ── Status columns for background function polling ────────
+-- Run this if you've already run schema.sql
+alter table public.sessions
+  add column if not exists niche_status  text default 'pending',
+  add column if not exists niche_error   text,
+  add column if not exists plan_status   text default 'pending',
+  add column if not exists plan_error    text,
+  add column if not exists dna_status    text default 'pending',
+  add column if not exists dna_error     text,
+  add column if not exists copy_status   text default 'pending',
+  add column if not exists copy_error    text;

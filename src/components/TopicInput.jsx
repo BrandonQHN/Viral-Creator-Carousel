@@ -1,6 +1,6 @@
 // src/components/TopicInput.jsx
 import { useState } from 'react';
-import { api } from '../lib/api';
+import { api, pollSession } from '../lib/api';
 
 const GOALS = [
   { value: 'grow audience', label: 'Grow the audience' },
@@ -11,19 +11,24 @@ const GOALS = [
 const EXAMPLES = ['backyard chickens', 'beginner sourdough', 'van life on a budget', 'urban foraging', 'beginner woodworking', 'personal finance for millennials'];
 
 export default function TopicInput({ onComplete }) {
-  const [topic, setTopic]   = useState('');
-  const [goal, setGoal]     = useState('grow audience');
+  const [topic, setTopic]     = useState('');
+  const [goal, setGoal]       = useState('grow audience');
   const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState('');
+  const [status, setStatus]   = useState('');
+  const [error, setError]     = useState('');
 
   async function submit() {
     if (!topic.trim()) return;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setStatus('Researching your niche...');
     try {
-      const data = await api.generateNiche(topic.trim(), goal);
-      onComplete(topic.trim(), goal, data.session_id, data.niche_brief);
+      // Step 1: fire background function, get session_id back instantly
+      const { session_id } = await api.generateNiche(topic.trim(), goal);
+      setStatus('Analyzing audience, pillars, and viral patterns...');
+      // Step 2: poll until niche_brief is written to Supabase
+      const niche_brief = await pollSession(session_id, 'niche_status', 'niche_brief');
+      onComplete(topic.trim(), goal, session_id, niche_brief);
     } catch (e) { setError(e.message); }
-    setLoading(false);
+    setLoading(false); setStatus('');
   }
 
   return (
@@ -47,11 +52,13 @@ export default function TopicInput({ onComplete }) {
             placeholder="e.g. backyard chickens, beginner sourdough, van life..."
             style={{ fontSize: 16 }}
             autoFocus
+            disabled={loading}
           />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
             {EXAMPLES.map(ex => (
-              <button key={ex} onClick={() => setTopic(ex)} style={{ background: 'var(--accentbg)', border: '1px solid var(--borderl)', color: 'var(--muted)', borderRadius: 20, padding: '3px 10px', fontSize: 11, cursor: 'pointer', transition: 'all 0.1s' }}
-                onMouseEnter={e => e.target.style.color = 'var(--accent)'}
+              <button key={ex} onClick={() => setTopic(ex)} disabled={loading}
+                style={{ background: 'var(--accentbg)', border: '1px solid var(--borderl)', color: 'var(--muted)', borderRadius: 20, padding: '3px 10px', fontSize: 11, cursor: 'pointer', transition: 'all 0.1s' }}
+                onMouseEnter={e => { if (!loading) e.target.style.color = 'var(--accent)'; }}
                 onMouseLeave={e => e.target.style.color = 'var(--muted)'}
               >{ex}</button>
             ))}
@@ -62,7 +69,7 @@ export default function TopicInput({ onComplete }) {
           <div className="label">NICHE GOAL</div>
           <div style={{ display: 'flex', gap: 8 }}>
             {GOALS.map(g => (
-              <button key={g.value} onClick={() => setGoal(g.value)}
+              <button key={g.value} onClick={() => setGoal(g.value)} disabled={loading}
                 className={`btn ${goal === g.value ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ flex: 1, fontSize: 11 }}>
                 {g.label}
@@ -72,7 +79,7 @@ export default function TopicInput({ onComplete }) {
         </div>
 
         <button className="btn btn-primary" onClick={submit} disabled={loading || !topic.trim()} style={{ width: '100%', padding: '14px', fontSize: 13, marginTop: 4 }}>
-          {loading ? 'Researching your niche...' : 'Research niche →'}
+          {loading ? (status || 'Working...') : 'Research niche →'}
         </button>
       </div>
     </div>
