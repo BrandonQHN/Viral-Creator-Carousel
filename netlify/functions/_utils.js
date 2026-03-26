@@ -74,7 +74,7 @@ async function callClaude({ system, user, maxTokens = 2000 }) {
     // If JSON is truncated, log it and throw a clear error
     console.error('JSON parse failed. Response length:', clean.length, 'Error:', e.message);
     console.error('Raw response tail:', clean.slice(-200));
-    throw new Error(`Claude response was cut off (${clean.length} chars). Try reducing maxTokens or simplifying the prompt.`);
+    throw new Error(`Claude response was cut off (${clean.length} chars) — maxTokens too low. Increase maxTokens in the function.`);
   }
 }
 

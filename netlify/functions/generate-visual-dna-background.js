@@ -22,7 +22,7 @@ exports.handler = async (event) => {
 
     const dna = await callClaude({
       system: SYSTEM,
-      maxTokens: 1000,
+      maxTokens: 1800,
       user: `Niche: "${session.topic}" | Audience: "${b.audience}" | Tone: "${b.voice_descriptor}"
 Viral insight: "${b.viral_insight}"
 
