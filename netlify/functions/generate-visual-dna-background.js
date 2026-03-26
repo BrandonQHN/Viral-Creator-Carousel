@@ -26,25 +26,25 @@ exports.handler = async (event) => {
       user: `Niche: "${session.topic}" | Audience: "${b.audience}" | Tone: "${b.voice_descriptor}"
 Viral insight: "${b.viral_insight}"
 
-Design a visual system for a faceless Instagram carousel page in this niche. Style reference: clean digital illustration like successful educational Instagram pages — flat or semi-flat, clear subjects, bright approachable colors, simple backgrounds. NOT photography. Text is overlaid by the app so images are supporting visuals only.
+Design a visual system for a faceless Instagram carousel page in this niche.
 
-Adapt the style specifically to this niche's aesthetic and audience. 40+ images must look consistent.
+TARGET STYLE: Clean editorial illustration — white or very light cream background, cartoon/illustrated subjects centered or bottom-anchored, bright friendly colors, clear negative space in upper portion for text. Think: educational Instagram carousels that look like illustrated infographics. NOT photography, NOT dark moody images, NOT cinematic. The background must be white or near-white so text can be placed on top without any overlay.
 
 {
-  "art_style": "specific illustration style — e.g. clean flat digital illustration, slightly textured, educational infographic feel",
+  "art_style": "clean flat digital illustration on white background, friendly cartoon style, bright colors, educational infographic aesthetic",
   "color_palette": {
-    "primary": "#hex — description",
-    "secondary": "#hex — description",
-    "accent": "#hex — description",
-    "background": "#hex — description e.g. soft cream or clean white"
+    "primary": "#hex — main brand color for text accents e.g. warm orange or deep teal",
+    "secondary": "#hex — secondary accent",
+    "accent": "#hex — highlight color",
+    "background": "#FFFFFF or #FFF8F0 — always white or very light cream"
   },
-  "lighting": "how light works in illustrations — e.g. soft diffused, subtle shadows, no harsh contrast",
-  "composition": "layout rules — e.g. centered subject, clean negative space, subject fills 60-70% of frame",
-  "texture_surface": "texture feel — e.g. slight paper texture, gentle grain",
-  "subject_framing": "what to depict — e.g. close-up of subject, minimal background, clear focal point",
-  "what_to_avoid": "e.g. photorealism, cluttered compositions, dark moody tones, complex backgrounds, text",
-  "slide_text_style": "Choose ONE: 'minimal' (image-forward — only headline on slide, body in caption; for lifestyle/aesthetic/story niches), 'overlay' (text-forward — headline + bullets on slide; for educational/tips/how-to niches), or 'balanced' (headline + one short line; for most niches). Base this on the niche, audience, and viral insight.",
-  "dalle_style_anchor": "60-80 words prepended to every DALL-E prompt. Must encode: illustration style, color palette, mood, composition rules. Written as DALL-E prompt language, not prose. Make it specific to this niche. MUST include this rule: main subject positioned in upper 60% of frame, bottom third kept clean and uncluttered for text overlay. End EXACTLY with this sentence: Do NOT include any text, words, letters, numbers, or typographic elements in this image."
+  "lighting": "flat even lighting, no shadows, no mood lighting — clean and bright",
+  "composition": "illustrated subject anchored at bottom or center, upper 40-50% of frame left as clean white/cream space for text overlay",
+  "texture_surface": "slight paper or parchment texture on white background, warm and approachable",
+  "subject_framing": "full character or object illustration, centered or bottom-third, surrounded by clean space",
+  "what_to_avoid": "dark backgrounds, moody lighting, photography style, cinematic color grading, busy backgrounds, subjects that fill the entire frame",
+  "slide_text_style": "Choose ONE based on niche: 'minimal' (lifestyle/story), 'overlay' (educational/tips), 'balanced' (general). For educational niches always pick 'overlay'.",
+  "dalle_style_anchor": "60-80 words. MUST specify: white or very light cream background, clean flat illustration style, cartoon characters, bright colors. The prompt will specify text to include on the slide — render it clearly in large bold dark font upper portion, with one key word in accent color. Illustrated subject sits in lower half. Written as DALL-E prompt language. End EXACTLY with: Render all specified text clearly and legibly on the image."
 }`,
     });
 

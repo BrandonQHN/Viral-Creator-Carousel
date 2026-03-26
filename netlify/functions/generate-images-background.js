@@ -36,14 +36,37 @@ exports.handler = async (event) => {
       user: `Visual DNA anchor (prepend VERBATIM to every prompt):
 "${visual_dna.dalle_style_anchor}"
 
-Generate one DALL-E 3 image prompt per slide. Each prompt = anchor (verbatim first) + slide subject. Max 150 words each. Never include text, words, letters, or typography in any image.
+Generate one DALL-E 3 image prompt per slide. Each prompt must produce a COMPLETE carousel slide with text already on the image — exactly like successful educational Instagram carousels.
 
-CRITICAL for every prompt: the bottom third of the image must be relatively clean, dark, or uncluttered — this space is reserved for text overlay. Place the main subject in the upper 60-70% of the frame. Do not put detailed focal points at the very bottom of the image.
+CRITICAL LAYOUT RULES FOR EVERY PROMPT:
+- White or very light cream background
+- The slide's HEADLINE TEXT must appear prominently on the image in large bold font, upper half
+- The key word or phrase gets a different color (use the brand accent color from the style)
+- A short supporting line appears below the headline in smaller text
+- The illustrated subject/character sits in the lower half or lower-right
+- Clean, editorial, professional — like a designed Instagram slide card
+
+Each prompt = style anchor (verbatim) + slide layout description including the actual text to show.
 
 Slides:
-${allSubjects.map((s, i) => `${i + 1}. Carousel ${s.carousel_num}, Slide ${s.slide_num}: ${s.subject}`).join('\n')}
+${allSubjects.map((s, i) => {
+  const carousel = all_copy.find(c => c.carousel_num === s.carousel_num);
+  const slide = carousel?.slides?.[s.slide_num - 1];
+  const headline = slide?.headline || s.subject;
+  const body = slide?.body ? slide.body.split('\n')[0].slice(0, 80) : '';
+  return `${i + 1}. Carousel ${s.carousel_num}, Slide ${s.slide_num}:
+   - Headline text on image: "${headline}"
+   - Supporting text: "${body}"
+   - Subject to illustrate: ${s.subject}`;
+}).join('\n\n')}
 
-Return a flat JSON array of ${allSubjects.length} strings in order.`,
+For each slide write a prompt that:
+1. Starts with the style anchor verbatim
+2. Describes the layout: headline text in large bold dark letters upper portion, supporting text below in smaller font, illustrated subject lower half
+3. Specifies the actual text content to appear on the slide
+4. Keeps it under 200 words total
+
+Return a flat JSON array of ${allSubjects.length} prompt strings in order.`,
     });
 
     // ── Step 2: Load content_plan from DB for format info ──

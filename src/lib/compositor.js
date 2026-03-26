@@ -35,9 +35,8 @@ function analyzeImage(ctx) {
   const overallBrightness = scored.reduce((s,z) => s + z.brightness, 0) / scored.length;
 
   // Detect light/white background style (like illustration on white)
-  // If the overall image is very bright AND top zone is bright AND variance is low
   const topZone = scored.find(z => z.name === 'top');
-  const isLightBackground = overallBrightness > 0.72 && (topZone?.brightness || 0) > 0.65;
+  const isLightBackground = overallBrightness > 0.62 && (topZone?.brightness || 0) > 0.55;
 
   return {
     zone: best.name,
@@ -67,22 +66,7 @@ export async function compositeSlide(imageUrl, slide, visualDna) {
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       ctx.drawImage(img, 0, 0, SIZE, SIZE);
-      const analysis = analyzeImage(ctx);
-
-      // Light background detected — dark text on light, no overlay needed
-      if (analysis.isLightBackground) {
-        drawLightBackground(ctx, slide, brandColor, analysis);
-        return resolve(canvas.toDataURL('image/jpeg', 0.93));
-      }
-
-      if (slide.type === 'cover') {
-        drawCover(ctx, slide, brandColor, analysis, textStyle);
-      } else if (slide.type === 'cta') {
-        drawCTA(ctx, slide, brandColor, analysis);
-      } else {
-        drawContent(ctx, slide, brandColor, analysis, textStyle);
-      }
-
+      // Text is baked into the image by DALL-E — return as-is
       resolve(canvas.toDataURL('image/jpeg', 0.93));
     };
     img.onerror = () => reject(new Error('Image load failed'));
@@ -90,90 +74,131 @@ export async function compositeSlide(imageUrl, slide, visualDna) {
   });
 }
 
-// ── LIGHT BACKGROUND — dark text on top, illustration below ──
-// Matches the style: white/cream bg, large dark headline fills top,
-// illustrated character anchored at bottom. No overlay needed.
+// ── LIGHT BACKGROUND — matches reference style ────────────────
+// White/cream bg, dark bold title fills top half,
+// accent color on key word, body text below, illustration bottom
 function drawLightBackground(ctx, slide, brandColor, analysis) {
-  const headline = slide.headline || '';
-  const subtext  = slide.subtext  || '';
-  const body     = slide.body     || '';
-  const isCover  = slide.type === 'cover';
-  const isCTA    = slide.type === 'cta';
+  const headline  = slide.headline || '';
+  const subtext   = slide.subtext  || '';
+  const body      = slide.body     || '';
+  const isCover   = slide.type === 'cover';
+  const isCTA     = slide.type === 'cta';
 
   if (isCTA) {
-    // CTA on light bg — brand color band across middle
-    const bandH = 120;
-    const bandY = SIZE * 0.35;
-    ctx.fillStyle = brandColor;
-    ctx.globalAlpha = 0.12;
-    ctx.fillRect(0, bandY, SIZE, bandH);
+    // CTA on light — simple centered with brand color accent
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+    // Brand color horizontal rules
+    ctx.strokeStyle = brandColor; ctx.lineWidth = 3; ctx.globalAlpha = 0.4;
+    ctx.beginPath(); ctx.moveTo(PAD, SIZE*0.38); ctx.lineTo(SIZE-PAD, SIZE*0.38); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PAD, SIZE*0.58); ctx.lineTo(SIZE-PAD, SIZE*0.58); ctx.stroke();
     ctx.globalAlpha = 1;
 
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    const headSize   = fitFontSize(ctx, headline, '800 52px', SIZE - PAD*2, 52, 28);
-    ctx.font         = `800 ${headSize}px Arial, sans-serif`;
-    ctx.fillStyle    = '#1a1814'; // near-black
-    ctx.fillText(headline, SIZE/2, bandY + bandH/2 - 16);
-    ctx.font      = `400 28px Arial, sans-serif`;
+    const headSize = fitFontSize(ctx, headline, '900 56px', SIZE-PAD*2, 56, 32);
+    ctx.font = `900 ${headSize}px Arial Black, Arial, sans-serif`;
+    ctx.fillStyle = '#1a1814';
+    setShadow(ctx, 0, 1, 3, 'rgba(0,0,0,0.08)');
+    ctx.fillText(headline, SIZE/2, SIZE*0.46);
+
+    ctx.font = `600 28px Arial, sans-serif`;
     ctx.fillStyle = brandColor;
-    ctx.fillText(body || 'Save this for later.', SIZE/2, bandY + bandH/2 + 30);
+    ctx.shadowBlur = 0;
+    ctx.fillText(body || 'Save this for later.', SIZE/2, SIZE*0.54);
+    clearShadow(ctx);
     return;
   }
 
-  // Text occupies top region, illustration has the bottom 45%
-  const textAreaH  = SIZE * 0.52; // text lives in top 52%
-  const textAreaPad = 52;
+  // Text occupies top ~48% of frame, illustration has the rest
+  const textZoneH   = SIZE * 0.48;
+  const textPad     = 52;
+  const maxTextW    = SIZE - textPad * 2;
 
-  // For content/cover slides — figure out font size that fills the space nicely
-  const maxTextWidth  = SIZE - textAreaPad * 2;
-  const headline2Show = isCover ? headline : headline;
-  const fontSize      = fitFontSize(ctx, headline2Show, '900 90px', maxTextWidth, 90, 38);
+  // Split headline into main + last word (last word gets accent color)
+  const words       = headline.trim().split(' ');
+  const accentWord  = words.length > 1 ? words[words.length - 1] : '';
+  const mainText    = words.length > 1 ? words.slice(0, -1).join(' ') : headline;
+
+  // Find font size that fits the full headline
+  const fontSize    = fitFontSize(ctx, headline, '900 88px', maxTextW, 88, 36);
   ctx.font = `900 ${fontSize}px Arial Black, Arial, sans-serif`;
 
-  const lines  = breakLines(ctx, headline2Show, maxTextWidth);
-  const lineH  = fontSize * 1.15;
-  const totalH = lines.length * lineH + (subtext || body ? fontSize * 0.8 : 0);
+  // Wrap full headline to get lines
+  const allLines    = breakLines(ctx, headline, maxTextW);
+  const lineH       = fontSize * 1.12;
 
-  // Vertically center text in top region
-  const startY = Math.max(textAreaPad, (textAreaH - totalH) / 2);
+  // Figure out if last word is on its own line or shares a line
+  const lastLine    = allLines[allLines.length - 1];
+  const otherLines  = allLines.slice(0, -1);
 
-  // Text — dark on light
-  ctx.fillStyle    = '#1a1814';
-  ctx.textAlign    = 'center';
+  // Total headline block height
+  const headBlockH  = allLines.length * lineH;
+
+  // Support text height
+  const supportText = isCover ? subtext : (body ? body.split('\n')[0] : '');
+  const suppFontSize = Math.min(fontSize * 0.38, 30);
+  const suppH       = supportText ? suppFontSize * 1.5 + 12 : 0;
+
+  // Total block
+  const totalBlockH = headBlockH + suppH + (supportText ? 16 : 0);
+  const startY      = Math.max(textPad, (textZoneH - totalBlockH) / 2 + 10);
+
+  // Draw each line of headline — last line has accent word colored
+  ctx.textAlign    = 'left';
   ctx.textBaseline = 'top';
-  ctx.shadowColor  = 'rgba(0,0,0,0.06)';
-  ctx.shadowBlur   = 3;
-  ctx.shadowOffsetY = 2;
+  setShadow(ctx, 0, 1, 2, 'rgba(0,0,0,0.06)');
 
-  lines.forEach((line, i) => {
-    ctx.font = `900 ${fontSize}px Arial Black, Arial, sans-serif`;
-    ctx.fillText(line, SIZE/2, startY + i * lineH);
+  allLines.forEach((line, i) => {
+    const isLastLine = i === allLines.length - 1;
+    const y = startY + i * lineH;
+
+    if (isLastLine && accentWord && line.endsWith(accentWord) && line !== headline) {
+      // Split last line: regular part + accent word
+      const regularPart = line.slice(0, line.length - accentWord.length).trimEnd();
+      ctx.font = `900 ${fontSize}px Arial Black, Arial, sans-serif`;
+
+      if (regularPart) {
+        ctx.fillStyle = '#1a1814';
+        ctx.fillText(regularPart + ' ', textPad, y);
+        const regW = ctx.measureText(regularPart + ' ').width;
+        ctx.fillStyle = brandColor;
+        ctx.fillText(accentWord, textPad + regW, y);
+      } else {
+        // Whole last line is the accent word
+        ctx.fillStyle = brandColor;
+        ctx.fillText(line, textPad, y);
+      }
+
+      // Underline accent — short brand line below last word
+      ctx.fillStyle = brandColor;
+      const accentW = ctx.measureText(regularPart ? accentWord : line).width;
+      const accentX = regularPart ? textPad + ctx.measureText(regularPart + ' ').width : textPad;
+      ctx.fillRect(accentX, y + fontSize + 4, Math.min(accentW, 140), 4);
+
+    } else {
+      ctx.font = `900 ${fontSize}px Arial Black, Arial, sans-serif`;
+      ctx.fillStyle = '#1a1814';
+      ctx.fillText(line, textPad, y);
+    }
   });
 
-  // Supporting text — brand color
-  const supportText = subtext || (body && !isCover ? body.split('\n')[0] : '');
+  // Support text
   if (supportText) {
-    const suppSize = Math.min(fontSize * 0.42, 32);
-    ctx.font      = `600 ${suppSize}px Arial, sans-serif`;
-    ctx.fillStyle = brandColor;
+    const suppY = startY + headBlockH + 16;
+    ctx.font = `500 ${suppFontSize}px Arial, sans-serif`;
+    ctx.fillStyle = '#5a5248';
     ctx.shadowBlur = 0;
-    ctx.fillText(supportText, SIZE/2, startY + lines.length * lineH + 8);
+    ctx.fillText(supportText, textPad, suppY);
   }
 
-  // Slide number — small pill, top-left
+  // Slide number — small top right
   if (!isCover && slide.num) {
     ctx.shadowBlur = 0;
-    drawPill(ctx, `${slide.num}`, textAreaPad, textAreaPad - 10, brandColor, '#fff', 18, 34);
+    ctx.font = `600 22px Arial, sans-serif`;
+    ctx.fillStyle = 'rgba(90,82,72,0.5)';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${slide.num}/`, SIZE - textPad, textPad - 10);
   }
-
-  // Thin brand underline below last text line
-  ctx.shadowBlur = 0;
-  const lastLineW = ctx.measureText(lines[lines.length - 1]).width;
-  const underlineY = startY + lines.length * lineH + (supportText ? fontSize*0.42 + 20 : 12);
-  const underlineW = Math.min(lastLineW * 0.35, 100);
-  ctx.fillStyle = brandColor;
-  ctx.fillRect(SIZE/2 - underlineW/2, underlineY, underlineW, 4);
 
   clearShadow(ctx);
 }
