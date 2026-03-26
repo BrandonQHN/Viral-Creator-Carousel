@@ -1,0 +1,151 @@
+// src/components/CopyReviewGate.jsx
+import { useState, useEffect } from 'react';
+import { api } from '../lib/api';
+
+function SlideEditor({ slide, onChange }) {
+  return (
+    <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: 12, display: 'grid', gridTemplateColumns: '40px 1fr', gap: 10, alignItems: 'start' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 9, color: slide.type === 'cover' ? 'var(--accent)' : slide.type === 'cta' ? 'var(--accentd)' : 'var(--muted)', letterSpacing: '0.08em', marginBottom: 2 }}>
+          {slide.type === 'cover' ? 'CVR' : slide.type === 'cta' ? 'CTA' : `S${slide.num}`}
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <input value={slide.headline} onChange={e => onChange({ ...slide, headline: e.target.value })} placeholder="Headline" style={{ fontSize: 12, fontWeight: 700 }} />
+        {slide.type !== 'cover' && (
+          <textarea value={slide.body || ''} onChange={e => onChange({ ...slide, body: e.target.value })} placeholder="Body copy" style={{ fontSize: 11, minHeight: 48, color: 'var(--muted)' }} />
+        )}
+        {slide.subtext !== undefined && slide.type === 'cover' && (
+          <input value={slide.subtext || ''} onChange={e => onChange({ ...slide, subtext: e.target.value })} placeholder="Subtext (optional)" style={{ fontSize: 11, color: 'var(--muted)' }} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function CopyReviewGate({ sessionId, nicheBrief, contentPlan, onBack, onConfirm }) {
+  const [allCopy, setAllCopy] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState('');
+  const [openIdx, setOpenIdx] = useState(0);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true); setError('');
+    try {
+      const data = await api.generateCopy(sessionId, nicheBrief, contentPlan);
+      setAllCopy(data.all_copy);
+    } catch (e) { setError(e.message); }
+    setLoading(false);
+  }
+
+  function updateSlide(carouselIdx, slideIdx, newSlide) {
+    setAllCopy(prev => {
+      const n = [...prev];
+      const slides = [...n[carouselIdx].slides];
+      slides[slideIdx] = newSlide;
+      n[carouselIdx] = { ...n[carouselIdx], slides };
+      return n;
+    });
+  }
+
+  function updateCaption(i, val) {
+    setAllCopy(prev => { const n = [...prev]; n[i] = { ...n[i], caption: val }; return n; });
+  }
+
+  function updateHashtags(i, val) {
+    setAllCopy(prev => { const n = [...prev]; n[i] = { ...n[i], hashtags: val }; return n; });
+  }
+
+  if (loading) return (
+    <div className="card" style={{ textAlign: 'center', padding: 60 }}>
+      <p className="muted">Writing all your copy...</p>
+      <p className="muted" style={{ marginTop: 8, fontSize: 11 }}>Headlines, body copy, captions, and hashtags for every carousel</p>
+    </div>
+  );
+
+  const totalSlides = allCopy?.reduce((s, c) => s + c.slides.length, 0) || 0;
+
+  return (
+    <div>
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 9, letterSpacing: '0.18em', color: 'var(--accentd)', marginBottom: 6 }}>GATE 4 — COPY REVIEW</div>
+        <div className="serif-heading">Review every word</div>
+        <p className="muted" style={{ marginTop: 6 }}>Edit any slide, caption, or hashtags. This is the last step before images generate.</p>
+      </div>
+
+      {error && <div className="err-box">{error}</div>}
+
+      {/* Carousel tabs */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+        {allCopy?.map((c, i) => (
+          <button key={i} onClick={() => setOpenIdx(i)}
+            className={`btn ${openIdx === i ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: 11, padding: '6px 14px' }}>
+            Carousel {c.carousel_num}
+          </button>
+        ))}
+      </div>
+
+      {allCopy?.[openIdx] && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Carousel header */}
+          <div className="card" style={{ background: 'var(--accentbg)', borderColor: 'var(--accentd)' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+              <span className="tag">{contentPlan?.[openIdx]?.format?.replace(/_/g,' ')}</span>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>{allCopy[openIdx].slides[0]?.headline}</span>
+            </div>
+            <p className="muted" style={{ marginTop: 4, fontSize: 11 }}>{allCopy[openIdx].slides.length} slides</p>
+          </div>
+
+          {/* Slides */}
+          <div className="card">
+            <div className="label" style={{ marginBottom: 10 }}>SLIDES</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {allCopy[openIdx].slides.map((slide, si) => (
+                <SlideEditor key={si} slide={slide} onChange={s => updateSlide(openIdx, si, s)} />
+              ))}
+            </div>
+          </div>
+
+          {/* Caption */}
+          <div className="card">
+            <div className="label" style={{ marginBottom: 6 }}>CAPTION</div>
+            <textarea value={allCopy[openIdx].caption} onChange={e => updateCaption(openIdx, e.target.value)} style={{ minHeight: 110, fontSize: 12, lineHeight: 1.8 }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+              <span className="muted">{allCopy[openIdx].caption?.length || 0} chars</span>
+              <span className="muted" style={{ color: allCopy[openIdx].caption?.length > 150 * 6 ? 'var(--err)' : 'var(--muted)' }}>
+                {Math.round((allCopy[openIdx].caption?.length || 0) / 5)} words est.
+              </span>
+            </div>
+          </div>
+
+          {/* Hashtags */}
+          <div className="card">
+            <div className="label" style={{ marginBottom: 6 }}>HASHTAGS</div>
+            <textarea value={allCopy[openIdx].hashtags} onChange={e => updateHashtags(openIdx, e.target.value)} style={{ minHeight: 56, fontSize: 11, color: 'var(--accent)' }} />
+          </div>
+
+          {/* Next/prev nav */}
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <button className="btn btn-ghost" onClick={() => setOpenIdx(i => Math.max(0, i - 1))} disabled={openIdx === 0}>← Prev carousel</button>
+            <button className="btn btn-ghost" onClick={() => setOpenIdx(i => Math.min(allCopy.length - 1, i + 1))} disabled={openIdx === allCopy.length - 1}>Next carousel →</button>
+          </div>
+        </div>
+      )}
+
+      <div className="sep" />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span className="muted">{allCopy?.length} carousels · {totalSlides} slides · ~{totalSlides} images to generate</span>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button className="btn btn-secondary" onClick={onBack}>← Back</button>
+          <button className="btn btn-primary" onClick={() => onConfirm(allCopy)} style={{ padding: '12px 28px' }}>
+            Copy confirmed — Generate images →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

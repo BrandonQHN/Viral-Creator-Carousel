@@ -1,0 +1,74 @@
+/* src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,400&display=swap');
+
+:root {
+  --bg: #0b0a08;
+  --card: #111009;
+  --card2: #181510;
+  --border: #221e14;
+  --borderl: #2e2718;
+  --accent: #c8943a;
+  --accentd: #8a6325;
+  --accentbg: rgba(200,148,58,0.08);
+  --text: #ede8dc;
+  --muted: #7a6e5c;
+  --success: #4a8c5c;
+  --successbg: rgba(74,140,92,0.1);
+  --err: #8c3a3a;
+  --errbg: rgba(140,58,58,0.1);
+  --mono: 'IBM Plex Mono', monospace;
+  --serif: 'Cormorant Garamond', serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; }
+body { background: var(--bg); color: var(--text); font-family: var(--mono); line-height: 1.7; -webkit-font-smoothing: antialiased; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--borderl); border-radius: 2px; }
+
+/* ── Form elements ── */
+input, textarea, select {
+  font-family: var(--mono); font-size: 13px;
+  color: var(--text); background: var(--bg);
+  border: 1px solid var(--borderl); border-radius: 6px;
+  padding: 10px 14px; outline: none; transition: border 0.15s;
+  width: 100%;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--accentd); }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.5; }
+textarea { resize: vertical; }
+select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a6e5c'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+select option { background: #1a1610; }
+
+/* ── Buttons ── */
+.btn { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; cursor: pointer; border-radius: 8px; transition: all 0.15s; border: 1px solid; padding: 10px 22px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #0b0a08; border-color: var(--accent); }
+.btn-primary:hover:not(:disabled) { background: #d9a347; }
+.btn-secondary { background: transparent; color: var(--muted); border-color: var(--borderl); }
+.btn-secondary:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
+.btn-ghost { background: transparent; color: var(--accentd); border-color: transparent; font-size: 11px; padding: 6px 10px; }
+.btn-ghost:hover:not(:disabled) { color: var(--accent); }
+
+/* ── Cards ── */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px 24px; }
+.card-sm { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+
+/* ── Labels / tags ── */
+.label { font-size: 9px; color: var(--accentd); letter-spacing: 0.14em; margin-bottom: 5px; }
+.tag { background: var(--accentbg); border: 1px solid var(--accentd); color: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: 10px; letter-spacing: 0.05em; }
+.tag-green { background: var(--successbg); border-color: var(--success); color: var(--success); }
+.muted { color: var(--muted); font-size: 11px; line-height: 1.6; }
+.sep { height: 1px; background: var(--border); margin: 18px 0; }
+
+/* ── Progress bar ── */
+.progress-bar { background: var(--border); border-radius: 3px; height: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); transition: width 0.4s ease; border-radius: 3px; }
+
+/* ── Error box ── */
+.err-box { background: var(--errbg); border: 1px solid var(--err); border-radius: 8px; padding: 10px 14px; color: #e88; font-size: 11px; margin-bottom: 14px; }
+
+/* ── Serif heading ── */
+.serif-heading { font-family: var(--serif); font-size: 24px; font-weight: 700; line-height: 1.1; margin-bottom: 4px; }
