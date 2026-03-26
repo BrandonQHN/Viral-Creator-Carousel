@@ -68,7 +68,14 @@ async function callClaude({ system, user, maxTokens = 2000 }) {
   const text = data.content.find(b => b.type === 'text')?.text || '';
   // Strip markdown code fences if present
   const clean = text.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
-  return JSON.parse(clean);
+  try {
+    return JSON.parse(clean);
+  } catch (e) {
+    // If JSON is truncated, log it and throw a clear error
+    console.error('JSON parse failed. Response length:', clean.length, 'Error:', e.message);
+    console.error('Raw response tail:', clean.slice(-200));
+    throw new Error(`Claude response was cut off (${clean.length} chars). Try reducing maxTokens or simplifying the prompt.`);
+  }
 }
 
 // ── Call DALL-E 3 ─────────────────────────────────────────────
