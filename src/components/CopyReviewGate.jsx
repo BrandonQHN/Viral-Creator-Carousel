@@ -65,6 +65,19 @@ export default function CopyReviewGate({ sessionId, nicheBrief, contentPlan, onB
     </div>
   );
 
+  if (!allCopy) return (
+    <div>
+      {error && <div className="err-box" style={{ marginBottom: 16 }}>{error}</div>}
+      <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+        <p className="muted" style={{ marginBottom: 16 }}>Failed to generate copy. Check Netlify env vars then retry.</p>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <button className="btn btn-primary" onClick={load}>Retry</button>
+          <button className="btn btn-secondary" onClick={onBack}>← Back</button>
+        </div>
+      </div>
+    </div>
+  );
+
   const totalSlides = allCopy?.reduce((s, c) => s + c.slides.length, 0) || 0;
 
   return (

@@ -51,6 +51,19 @@ export default function ContentPlanGate({ sessionId, nicheBrief, onBack, onConfi
 
   if (loading) return <div className="card" style={{ textAlign: 'center', padding: 60 }}><p className="muted">Planning your content week...</p></div>;
 
+  if (!plan) return (
+    <div>
+      {error && <div className="err-box" style={{ marginBottom: 16 }}>{error}</div>}
+      <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+        <p className="muted" style={{ marginBottom: 16 }}>Failed to generate content plan. Check Netlify env vars then retry.</p>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <button className="btn btn-primary" onClick={load}>Retry</button>
+          <button className="btn btn-secondary" onClick={onBack}>← Back</button>
+        </div>
+      </div>
+    </div>
+  );
+
   const totalSlides = plan?.reduce((sum, c) => sum + (c.recommended_slides || 7), 0) || 0;
 
   return (

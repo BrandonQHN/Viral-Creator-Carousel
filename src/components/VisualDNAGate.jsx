@@ -38,6 +38,19 @@ export default function VisualDNAGate({ sessionId, nicheBrief, onBack, onConfirm
     </div>
   );
 
+  if (!dna) return (
+    <div>
+      {error && <div className="err-box" style={{ marginBottom: 16 }}>{error}</div>}
+      <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+        <p className="muted" style={{ marginBottom: 16 }}>Failed to generate visual DNA. Check that all Netlify env vars are set (SUPABASE_ANON_KEY, ANTHROPIC_KEY, OPENAI_KEY) then retry.</p>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <button className="btn btn-primary" onClick={load}>Retry</button>
+          <button className="btn btn-secondary" onClick={onBack}>← Back</button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div>
       <div style={{ marginBottom: 28 }}>
